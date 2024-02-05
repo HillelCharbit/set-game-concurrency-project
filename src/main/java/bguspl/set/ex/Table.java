@@ -106,11 +106,7 @@ public class Table {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
     
-        Integer card = slotToCard[slot];
-        if (card != null) {
-            cardToSlot[card] = null;
-            slotToCard[slot] = null;
-        }
+        
     }
 
     /**
