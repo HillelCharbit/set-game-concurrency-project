@@ -105,8 +105,12 @@ public class Table {
         try {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
-
-        // TODO implement
+    
+        Integer card = slotToCard[slot];
+        if (card != null) {
+            cardToSlot[card] = null;
+            slotToCard[slot] = null;
+        }
     }
 
     /**
