@@ -37,11 +37,19 @@ public class Dealer implements Runnable {
      */
     private long reshuffleTime = Long.MAX_VALUE;
 
+    public Queue<Integer> PlayerQueue;
+
+    private Thread dealerThread;
+
+    public volatile boolean isFree;
+
     public Dealer(Env env, Table table, Player[] players) {
         this.env = env;
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
+        PlayerQueue = new LinkedList<>();
+        isFree = true;
     }
 
     /**
@@ -49,12 +57,21 @@ public class Dealer implements Runnable {
      */
     @Override
     public void run() {
+        dealerThread = Thread.currentThread();
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+        for(Player p : players){
+            Thread PlayerThread = new Thread(player);
+            PlayerThread.start();
+        }
         while (!shouldFinish()) {
             placeCardsOnTable();
             timerLoop();
             updateTimerDisplay(false);
             removeAllCardsFromTable();
+            for(Player p : players){
+                p.removeAllTokens();
+            }
+            emptyPlayerQueue();
         }
         announceWinners();
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -128,5 +145,13 @@ public class Dealer implements Runnable {
      */
     private void announceWinners() {
         // TODO implement
+    }
+
+    emptyPlayerQueue(){
+        while(!PlayerQueue.isEmpty() && !terminate){
+            sinchronized(Players[PlayerQueue.peek()]){
+                Players[playersQueue.remove()].notifyAll();
+            }
+        }
     }
 }
