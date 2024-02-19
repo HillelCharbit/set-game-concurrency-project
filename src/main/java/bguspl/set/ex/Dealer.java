@@ -1,8 +1,10 @@
 package bguspl.set.ex;
 
 import bguspl.set.Env;
+import bguspl.set.ThreadLogger;
 
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -37,6 +39,8 @@ public class Dealer implements Runnable {
      */
     private long reshuffleTime = Long.MAX_VALUE;
 
+    private ThreadLogger[] playerThreads;
+
     public Dealer(Env env, Table table, Player[] players) {
         this.env = env;
         this.table = table;
@@ -50,6 +54,7 @@ public class Dealer implements Runnable {
     @Override
     public void run() {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
+        createPlayerThreads();
         while (!shouldFinish()) {
             placeCardsOnTable();
             timerLoop();
@@ -92,14 +97,21 @@ public class Dealer implements Runnable {
      * Checks cards should be removed from the table and removes them.
      */
     private void removeCardsFromTable() {
-        // TODO implement
+        
     }
 
     /**
      * Check if any cards can be removed from the deck and placed on the table.
      */
     private void placeCardsOnTable() {
-        // TODO implement
+        Random randomSlot = new Random();
+        Random randomCard = new Random();
+        while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
+            int slotIndex = randomSlot.nextInt(table.GetEmptySlots().size());
+            int card = randomCard.nextInt(deck.size());
+            table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
+            deck.remove(card);
+        }
     }
 
     /**
@@ -113,14 +125,19 @@ public class Dealer implements Runnable {
      * Reset and/or update the countdown and the countdown display.
      */
     private void updateTimerDisplay(boolean reset) {
-        // TODO implement
+        // TODO implement        
     }
 
     /**
      * Returns all the cards from the table to the deck.
      */
     private void removeAllCardsFromTable() {
-        // TODO implement
+        Random randomSlot = new Random();
+        while (table.GetEmptySlots().size() > 0) {
+            int slot = randomSlot.nextInt(table.getTableSize());
+            deck.add(table.getCard(slot));
+            table.removeCard(slot);
+        }
     }
 
     /**
@@ -128,5 +145,13 @@ public class Dealer implements Runnable {
      */
     private void announceWinners() {
         // TODO implement
+    }
+
+    private void createPlayerThreads() {
+        playerThreads = new ThreadLogger[players.length];
+        for (int i = 0; i < players.length; i++) {
+            playerThreads[i] = new ThreadLogger(players[i], "Player's ID: " + players[i].id, env.logger);
+            playerThreads[i].startWithLog();
+        }
     }
 }

@@ -2,6 +2,7 @@ package bguspl.set.ex;
 
 import bguspl.set.Env;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -30,6 +31,11 @@ public class Table {
     protected final Integer[] cardToSlot; // slot per card (if any)
 
     /**
+     * Mapping between a slot and the player's id if a token is placed in it (null if none).
+     */
+    protected Integer[] slotToPlayerToken; // player token per slot (if any)
+
+    /**
      * Constructor for testing.
      *
      * @param env        - the game environment objects.
@@ -41,6 +47,7 @@ public class Table {
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
+        slotToPlayerToken = new Integer[slotToCard.length];
     }
 
     /**
@@ -93,8 +100,7 @@ public class Table {
 
         cardToSlot[card] = slot;
         slotToCard[slot] = card;
-
-        // TODO implement
+        env.ui.placeCard(card, slot);
     }
 
     /**
@@ -105,8 +111,11 @@ public class Table {
         try {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
-
-        // TODO implement
+        int card = slotToCard[slot];
+        slotToCard[slot] = null;
+        cardToSlot[card] = null;
+        slotToPlayerToken[slot] = null;
+        env.ui.removeCard(slot);
     }
 
     /**
@@ -115,7 +124,16 @@ public class Table {
      * @param slot   - the slot on which to place the token.
      */
     public void placeToken(int player, int slot) {
-        // TODO implement
+        if (slotToCard[slot] == null) {
+            env.logger.warning("error: trying to place a token on an empty slot");
+            return;
+        }
+        if (slotToPlayerToken[slot] != null) {
+            env.logger.warning("error: trying to place a token on a slot that already has a token");
+            return;
+        }
+        slotToPlayerToken[slot] = player;
+        env.ui.placeToken(player, slot);
     }
 
     /**
@@ -125,7 +143,34 @@ public class Table {
      * @return       - true iff a token was successfully removed.
      */
     public boolean removeToken(int player, int slot) {
-        // TODO implement
-        return false;
+        if (slotToCard[slot] == null) {
+            env.logger.warning("error: trying to remove a token from an empty slot");
+            return false;
+        }
+        if (slotToPlayerToken[slot] != player) {
+            env.logger.warning("error: trying to remove a token of a different player from a slot");
+            return false;
+        }
+        slotToPlayerToken[slot] = null;
+        env.ui.removeToken(player, slot);
+        return true;
+    }
+
+    public int getTableSize() {
+        return env.config.tableSize;
+    }
+
+    public int getCard(int slot) {
+        return slotToCard[slot];
+    }
+    
+    public ArrayList<Integer> GetEmptySlots() {
+        ArrayList<Integer> emptySlots = new ArrayList<>();
+        for (int i = 0; i < slotToCard.length; i++) 
+        {
+            if (slotToCard[i] == null)
+                emptySlots.add(i);
+        }
+        return emptySlots;
     }
 }

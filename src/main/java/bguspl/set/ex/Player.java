@@ -77,6 +77,7 @@ public class Player implements Runnable {
 
         while (!terminate) {
             // TODO implement main player loop
+            
         }
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
