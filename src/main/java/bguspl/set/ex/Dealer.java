@@ -46,8 +46,6 @@ public class Dealer implements Runnable {
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
-        PlayerQueue = new LinkedList<>();
-        isFree = true;
     }
 
     /**
@@ -55,7 +53,6 @@ public class Dealer implements Runnable {
      */
     @Override
     public void run() {
-        dealerThread = Thread.currentThread();
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         createPlayerThreads();
         while (!shouldFinish()) {
@@ -63,10 +60,6 @@ public class Dealer implements Runnable {
             timerLoop();
             updateTimerDisplay(false);
             removeAllCardsFromTable();
-            for(Player p : players){
-                p.removeAllTokens();
-            }
-            emptyPlayerQueue();
         }
         announceWinners();
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -132,7 +125,17 @@ public class Dealer implements Runnable {
      * Reset and/or update the countdown and the countdown display.
      */
     private void updateTimerDisplay(boolean reset) {
-        // TODO implement        
+        if (reset) {
+            reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+        }
+        long gap = reshuffleTime-System.currentTimeMillis();
+        boolean warn = false;
+        if (gap < env.config.turnTimeoutWarningMillis) {
+            warn = true;
+        }       
+        if (gap > 0) {
+            env.ui.setCountdown(reshuffleTime-System.currentTimeMillis(), warn);
+        } 
     }
 
     /**
