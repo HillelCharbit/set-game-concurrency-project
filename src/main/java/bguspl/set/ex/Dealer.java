@@ -46,6 +46,8 @@ public class Dealer implements Runnable {
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
+        PlayerQueue = new LinkedList<>();
+        isFree = true;
     }
 
     /**
@@ -53,6 +55,7 @@ public class Dealer implements Runnable {
      */
     @Override
     public void run() {
+        dealerThread = Thread.currentThread();
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         createPlayerThreads();
         while (!shouldFinish()) {
@@ -60,6 +63,10 @@ public class Dealer implements Runnable {
             timerLoop();
             updateTimerDisplay(false);
             removeAllCardsFromTable();
+            for(Player p : players){
+                p.removeAllTokens();
+            }
+            emptyPlayerQueue();
         }
         announceWinners();
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
