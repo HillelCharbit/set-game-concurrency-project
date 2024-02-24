@@ -41,11 +41,23 @@ public class Dealer implements Runnable {
 
     private ThreadLogger[] playerThreads;
 
+        /**
+     * The thread representing the current dealer.
+     */
+    private Thread dealerThread;
+
+    /**
+     * True iff the table is busy (i.e. true during a table setup change).
+     */
+    public volatile boolean isTableBusy;
+
+
     public Dealer(Env env, Table table, Player[] players) {
         this.env = env;
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
+        isTableBusy = false;
     }
 
     /**
@@ -53,12 +65,13 @@ public class Dealer implements Runnable {
      */
     @Override
     public void run() {
+        dealerThread = Thread.currentThread();
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         createPlayerThreads();
         while (!shouldFinish()) {
             placeCardsOnTable();
+            updateTimerDisplay(true);
             timerLoop();
-            updateTimerDisplay(false);
             removeAllCardsFromTable();
         }
         announceWinners();
@@ -81,7 +94,13 @@ public class Dealer implements Runnable {
      * Called when the game should be terminated.
      */
     public void terminate() {
-        // TODO implement
+        terminate = true;
+        synchronized(this) {
+            notifyAll();
+        }
+        for (Player player: players) {
+            player.terminate();
+        }
     }
 
     /**
@@ -104,21 +123,33 @@ public class Dealer implements Runnable {
      * Check if any cards can be removed from the deck and placed on the table.
      */
     private void placeCardsOnTable() {
-        Random randomSlot = new Random();
-        Random randomCard = new Random();
+        isTableBusy = true;
+        Random rand = new Random();
         while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
-            int slotIndex = randomSlot.nextInt(table.GetEmptySlots().size());
-            int card = randomCard.nextInt(deck.size());
+            int slotIndex = rand.nextInt(table.GetEmptySlots().size());
+            int card = rand.nextInt(deck.size());
             table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
             deck.remove(card);
         }
+        isTableBusy = false;
     }
 
     /**
      * Sleep for a fixed amount of time or until the thread is awakened for some purpose.
      */
     private void sleepUntilWokenOrTimeout() {
-        // TODO implement
+        try {
+            synchronized(this) {
+                if (reshuffleTime - System.currentTimeMillis() > env.config.turnTimeoutWarningMillis) {
+                    Thread.sleep(950);
+                }
+                else {
+                    Thread.sleep(9);
+                }
+            }
+        } 
+        catch (InterruptedException ignored) {
+        }
     }
 
     /**
@@ -128,7 +159,7 @@ public class Dealer implements Runnable {
         if (reset) {
             reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
         }
-        long gap = reshuffleTime-System.currentTimeMillis();
+        long gap = reshuffleTime - System.currentTimeMillis();
         boolean warn = false;
         if (gap < env.config.turnTimeoutWarningMillis) {
             warn = true;
@@ -142,6 +173,7 @@ public class Dealer implements Runnable {
      * Returns all the cards from the table to the deck.
      */
     private void removeAllCardsFromTable() {
+        isTableBusy = true;
         Random randomSlot = new Random();
         while (table.GetEmptySlots().size() > 0) {
             int slot = randomSlot.nextInt(table.getTableSize());
@@ -154,7 +186,17 @@ public class Dealer implements Runnable {
      * Check who is/are the winner/s and displays them.
      */
     private void announceWinners() {
-        // TODO implement
+        int maxScore = maxScore();
+        int numWinners = numOfWinners(maxScore);
+
+        int[] winners = new int[numWinners];
+
+        for (Player player: players) {
+            if (player.score() == maxScore)
+                winners[--numWinners] = player.id;
+            
+        }
+        env.ui.announceWinner(winners);
     }
 
     private void createPlayerThreads() {
@@ -164,4 +206,24 @@ public class Dealer implements Runnable {
             playerThreads[i].startWithLog();
         }
     }
+
+    private int maxScore() {
+        int maxScore = 0;
+        for (Player player: players) {
+            if (player.score() > maxScore) {
+                maxScore = player.score();
+            }
+        }
+        return maxScore;
+    }
+    private int numOfWinners(int maxScore) {
+        int numWinners = 0;
+        for (Player player: players) {
+            if (player.score() == maxScore) {
+                numWinners++;
+            }
+        }
+        return numWinners;
+    }
+
 }

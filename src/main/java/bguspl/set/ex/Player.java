@@ -1,5 +1,9 @@
 package bguspl.set.ex;
 
+import java.util.Random;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+
 import bguspl.set.Env;
 
 /**
@@ -51,6 +55,11 @@ public class Player implements Runnable {
     private int score;
     
     /**
+     * 
+     */
+    private volatile BlockingQueue<Integer> actions;
+
+    /**
      * The class constructor.
      *
      * @param env    - the environment object.
@@ -64,6 +73,7 @@ public class Player implements Runnable {
         this.table = table;
         this.id = id;
         this.human = human;
+        this.actions = new ArrayBlockingQueue<Integer>(env.config.featureSize);
     }
 
     /**
@@ -75,10 +85,26 @@ public class Player implements Runnable {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         if (!human) createArtificialIntelligence();
 
-        while (!terminate) {
-            // TODO implement main player loop
-            
+        while (!terminate) {    
+            if (human) {
+                while (actions.isEmpty()) {
+                    try {
+                        synchronized (this) { wait(); }
+                    } catch (InterruptedException ignored) {}
+                }
+            }
+    
+            while (!actions.isEmpty()) {
+                executeAction();
+            }
+
+            if (!human) {
+             synchronized (aiThread) {
+                 aiThread.notifyAll();
+                }
+            }
         }
+        
         if (!human) try { aiThread.join(); } catch (InterruptedException ignored) {}
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
     }
@@ -88,13 +114,18 @@ public class Player implements Runnable {
      * key presses. If the queue of key presses is full, the thread waits until it is not full.
      */
     private void createArtificialIntelligence() {
+        Random random = new Random();
         // note: this is a very, very smart AI (!)
         aiThread = new Thread(() -> {
             env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
             while (!terminate) {
-                // TODO implement player key press simulator
+
                 try {
-                    synchronized (this) { wait(); }
+                    Thread.sleep(500);
+                    synchronized (aiThread) { 
+                        aiThread.wait();
+                        actions.offer(random.nextInt(table.getTableSize()));
+                    }
                 } catch (InterruptedException ignored) {}
             }
             env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -106,7 +137,11 @@ public class Player implements Runnable {
      * Called when the game should be terminated.
      */
     public void terminate() {
-        // TODO implement
+        terminate = true;
+        synchronized (this) 
+        { 
+            notifyAll(); 
+        }
     }
 
     /**
@@ -115,7 +150,30 @@ public class Player implements Runnable {
      * @param slot - the slot corresponding to the key pressed.
      */
     public void keyPressed(int slot) {
-        // TODO implement
+        if (human) {
+            try {
+                synchronized (actions) {
+                    actions.put(slot);
+                }
+                synchronized (this) 
+                { 
+                    notifyAll(); 
+                }
+            } catch (InterruptedException ignored) {}
+        }
+        else {
+            env.logger.warning("error: trying to press a key on a computer player");
+        }
+    }
+
+    /**
+        * Execute the next action in the queue.
+        */
+    private void executeAction() {
+        synchronized (actions) {
+            int slot = actions.poll();
+            table.placeOrRemoveToken(id, slot);
+        }
     }
 
     /**
@@ -125,17 +183,28 @@ public class Player implements Runnable {
      * @post - the player's score is updated in the ui.
      */
     public void point() {
-        // TODO implement
-
-        int ignored = table.countCards(); // this part is just for demonstration in the unit tests
         env.ui.setScore(id, ++score);
+        long freezeTime = System.currentTimeMillis() + env.config.pointFreezeMillis;
+        while (System.currentTimeMillis() < freezeTime) {
+            env.ui.setFreeze(id, freezeTime - System.currentTimeMillis());
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {}
+        }
+        int ignored = table.countCards(); // this part is just for demonstration in the unit tests
     }
 
     /**
      * Penalize a player and perform other related actions.
      */
     public void penalty() {
-        // TODO implement
+        long freezeTime = System.currentTimeMillis() + env.config.penaltyFreezeMillis;
+        while (System.currentTimeMillis() < freezeTime) {
+            env.ui.setFreeze(id, freezeTime - System.currentTimeMillis());
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {}
+        }
     }
 
     public int score() {

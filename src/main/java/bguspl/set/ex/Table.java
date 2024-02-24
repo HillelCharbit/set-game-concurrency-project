@@ -118,18 +118,26 @@ public class Table {
         env.ui.removeCard(slot);
     }
 
+    public synchronized void placeOrRemoveToken(int player, int slot) {
+        if (samePlayerTokenOnSlot(player, slot)) {
+            removeToken(player, slot);
+        } else {
+            placeToken(player, slot);
+        }
+    }
+
     /**
      * Places a player token on a grid slot.
      * @param player - the player the token belongs to.
      * @param slot   - the slot on which to place the token.
      */
     public void placeToken(int player, int slot) {
-        if (slotToCard[slot] == null) {
+        if (!slotHasCard(slot)) {
             env.logger.warning("error: trying to place a token on an empty slot");
             return;
         }
-        if (slotToPlayerToken[slot] != null) {
-            env.logger.warning("error: trying to place a token on a slot that already has a token");
+        if (playerHasMaxTokens(player)) {
+            env.logger.warning("error: trying to place a token when the player already has the maximum number of tokens");
             return;
         }
         slotToPlayerToken[slot] = player;
@@ -172,5 +180,21 @@ public class Table {
                 emptySlots.add(i);
         }
         return emptySlots;
+    }
+
+    private boolean slotHasCard(int slot) {
+        return slotToCard[slot] != null;
+    }
+
+    private boolean samePlayerTokenOnSlot(int player, int slot) {
+        return slotToPlayerToken[slot] != null && slotToPlayerToken[slot] == player;
+    }
+
+    private boolean playerHasMaxTokens(int player) {
+        int tokens = 0;
+        for (Integer token : slotToPlayerToken)
+            if (token != null && token == player)
+                ++tokens;
+        return tokens == env.config.featureSize;
     }
 }
