@@ -2,9 +2,12 @@ package bguspl.set.ex;
 
 import bguspl.set.Env;
 import bguspl.set.ThreadLogger;
+import bguspl.set.ex.Player.State;
 
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -41,23 +44,16 @@ public class Dealer implements Runnable {
 
     private ThreadLogger[] playerThreads;
 
-        /**
-     * The thread representing the current dealer.
-     */
+    private BlockingQueue<CardSet> setsToCheck;
+
     private Thread dealerThread;
-
-    /**
-     * True iff the table is busy (i.e. true during a table setup change).
-     */
-    public volatile boolean isTableBusy;
-
 
     public Dealer(Env env, Table table, Player[] players) {
         this.env = env;
         this.table = table;
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
-        isTableBusy = false;
+        setsToCheck = new LinkedBlockingQueue<>();
     }
 
     /**
@@ -85,9 +81,12 @@ public class Dealer implements Runnable {
         while (!terminate && System.currentTimeMillis() < reshuffleTime) {
             sleepUntilWokenOrTimeout();
             updateTimerDisplay(false);
-            removeCardsFromTable();
-            placeCardsOnTable();
-        }
+            if (!setsToCheck.isEmpty()) 
+                executeSetCheck();
+            if (table.GetEmptySlots().size() > 0) 
+                placeCardsOnTable();
+            
+            }
     }
 
     /**
@@ -112,18 +111,31 @@ public class Dealer implements Runnable {
         return terminate || env.util.findSets(deck, 1).size() == 0;
     }
 
-    /**
-     * Checks cards should be removed from the table and removes them.
-     */
-    private void removeCardsFromTable() {
-        
+    private void executeSetCheck() {
+        CardSet set = setsToCheck.poll();
+        synchronized (players[set.getPlayerId()]) {        
+            if (table.isLegalSet(set.getSlots())) {
+                int[] cards = table.slotsToCards(set.getSlots());
+                if (env.util.testSet(cards)) {
+                    players[set.getPlayerId()].setFreezeState(State.Point);
+                    updateTimerDisplay(true);
+                    for (int slot: set.getSlots()) {
+                        table.removeCard(slot);
+                    }
+                }
+                else {
+                    players[set.getPlayerId()].setFreezeState(State.Penalty);
+                }
+            }
+            players[set.getPlayerId()].notifyAll();
+        }
     }
 
     /**
      * Check if any cards can be removed from the deck and placed on the table.
      */
     private void placeCardsOnTable() {
-        isTableBusy = true;
+        table.lockTable();
         Random rand = new Random();
         while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
             int slotIndex = rand.nextInt(table.GetEmptySlots().size());
@@ -131,7 +143,7 @@ public class Dealer implements Runnable {
             table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
             deck.remove(card);
         }
-        isTableBusy = false;
+        table.unlockTable();
     }
 
     /**
@@ -173,19 +185,23 @@ public class Dealer implements Runnable {
      * Returns all the cards from the table to the deck.
      */
     private void removeAllCardsFromTable() {
-        isTableBusy = true;
+        table.lockTable();
         Random randomSlot = new Random();
-        while (table.GetEmptySlots().size() > 0) {
+        while (table.GetEmptySlots().size() != table.getTableSize()) {
             int slot = randomSlot.nextInt(table.getTableSize());
-            deck.add(table.getCard(slot));
-            table.removeCard(slot);
+            if (table.getCard(slot) != -1) {
+                deck.add(table.getCard(slot));
+                table.removeCard(slot);
+            }
         }
+        table.unlockTable();
     }
 
     /**
      * Check who is/are the winner/s and displays them.
      */
     private void announceWinners() {
+        table.lockTable();
         int maxScore = maxScore();
         int numWinners = numOfWinners(maxScore);
 
@@ -226,4 +242,8 @@ public class Dealer implements Runnable {
         return numWinners;
     }
 
+    public synchronized void addSetToCheck(CardSet set) {
+        setsToCheck.offer(set);
+        dealerThread.interrupt();
+    }
 }

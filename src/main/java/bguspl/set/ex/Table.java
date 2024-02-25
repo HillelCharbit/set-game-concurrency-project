@@ -4,8 +4,11 @@ import bguspl.set.Env;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +36,9 @@ public class Table {
     /**
      * Mapping between a slot and the player's id if a token is placed in it (null if none).
      */
-    protected Integer[] slotToPlayerToken; // player token per slot (if any)
+    protected volatile Set<Integer>[] slotToPlayerToken; // player token per slot (if any)
+
+    private boolean isBusy;
 
     /**
      * Constructor for testing.
@@ -43,11 +48,14 @@ public class Table {
      * @param cardToSlot - mapping between a card and the slot it is in (null if none).
      */
     public Table(Env env, Integer[] slotToCard, Integer[] cardToSlot) {
-
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
-        slotToPlayerToken = new Integer[slotToCard.length];
+        slotToPlayerToken = new Set[env.config.tableSize];
+        for (int i = 0; i < env.config.tableSize; i++) {
+            slotToPlayerToken[i] = Collections.synchronizedSet(new HashSet<>());
+        }        
+        this.isBusy = false;
     }
 
     /**
@@ -111,10 +119,19 @@ public class Table {
         try {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
+
+        // if there is a token on the card, remove it
+        synchronized (slotToPlayerToken[slot]){
+            if (slotToPlayerToken[slot] != null && !slotToPlayerToken[slot].isEmpty()) {
+                for (int player : slotToPlayerToken[slot]) {
+                    removeToken(player, slot);
+                }
+            }
+        }
+        // remove the card from the table
         int card = slotToCard[slot];
         slotToCard[slot] = null;
         cardToSlot[card] = null;
-        slotToPlayerToken[slot] = null;
         env.ui.removeCard(slot);
     }
 
@@ -140,8 +157,11 @@ public class Table {
             env.logger.warning("error: trying to place a token when the player already has the maximum number of tokens");
             return;
         }
-        slotToPlayerToken[slot] = player;
+        synchronized (slotToPlayerToken[slot]){       
+            slotToPlayerToken[slot].add(player);
+        }
         env.ui.placeToken(player, slot);
+        
     }
 
     /**
@@ -155,20 +175,19 @@ public class Table {
             env.logger.warning("error: trying to remove a token from an empty slot");
             return false;
         }
-        if (slotToPlayerToken[slot] != player) {
-            env.logger.warning("error: trying to remove a token of a different player from a slot");
-            return false;
-        }
-        slotToPlayerToken[slot] = null;
+        slotToPlayerToken[slot].remove(player);
         env.ui.removeToken(player, slot);
         return true;
     }
 
-    public int getTableSize() {
+    public int getTableSize() { 
         return env.config.tableSize;
     }
 
     public int getCard(int slot) {
+        if (slotToCard[slot] == null) {
+            return -1;
+        }
         return slotToCard[slot];
     }
     
@@ -187,14 +206,66 @@ public class Table {
     }
 
     private boolean samePlayerTokenOnSlot(int player, int slot) {
-        return slotToPlayerToken[slot] != null && slotToPlayerToken[slot] == player;
+        return slotToPlayerToken[slot] != null && slotToPlayerToken[slot].contains(player);
     }
 
-    private boolean playerHasMaxTokens(int player) {
+    public boolean playerHasMaxTokens(int player) {
         int tokens = 0;
-        for (Integer token : slotToPlayerToken)
-            if (token != null && token == player)
-                ++tokens;
+        for (int i = 0; i < slotToPlayerToken.length; i++) {
+            if (slotToPlayerToken[i] != null && slotToPlayerToken[i].contains(player)) {
+                tokens++;
+            }
+        }
         return tokens == env.config.featureSize;
     }
+
+    public int[] getPlayerSlots(int player) {
+        int[] slots = new int[env.config.featureSize];
+        int j = 0;
+        for (int i = 0; i < slotToPlayerToken.length; i++) {
+            if (slotToPlayerToken[i] != null && slotToPlayerToken[i].contains(player)) {
+                slots[j++] = i;
+            }
+        }
+        return slots;
+    }
+
+    public int[] slotsToCards(int[] slots) {
+        int[] cards = new int[slots.length];
+        for (int i = 0; i < slots.length; i++) {
+            cards[i] = slotToCard[slots[i]];
+        }
+        return cards;
+    }
+
+    // Check if there is a token of the player on the slots
+    public boolean isLegalSet(int[] slots) {
+        for (int slot : slots) {
+            if (slotToPlayerToken[slot] == null) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void removePlayerTokens(int player) {
+        for (int i = 0; i < slotToPlayerToken.length; i++) {
+            if (slotToPlayerToken[i] != null && slotToPlayerToken[i].contains(player)) {
+                removeToken(player, i);
+            }
+        }
+    }
+    
+    public void lockTable() {
+        isBusy = true;
+    }
+
+    public void unlockTable() {
+        isBusy = false;
+    }
+
+    public boolean isBusy() {
+        return isBusy;
+    }
+
 }
