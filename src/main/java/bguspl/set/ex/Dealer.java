@@ -136,12 +136,25 @@ public class Dealer implements Runnable {
      */
     private void placeCardsOnTable() {
         table.lockTable();
-        Random rand = new Random();
-        while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
-            int slotIndex = rand.nextInt(table.GetEmptySlots().size());
-            int card = rand.nextInt(deck.size());
-            table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
-            deck.remove(card);
+        // Random rand = new Random();
+        // while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
+        //     int slotIndex = rand.nextInt(table.GetEmptySlots().size());
+        //     int card = rand.nextInt(deck.size());
+        //     table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
+        //     deck.remove(card);
+        // }
+        for (int i=0; i<table.slotToCard.length; i++) {
+            if (table.slotToCard[i]==null) {
+                if (!deck.isEmpty()) {
+                    // Random rand = new Random();
+                    // int index = rand.nextInt(deck.size());
+                    int index = 0;
+
+                    int card = deck.get(index);
+                    deck.remove(index);
+                    table.placeCard(card,i);
+                }
+            }
         }
         table.unlockTable();
     }

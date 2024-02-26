@@ -121,11 +121,11 @@ public class Table {
         } catch (InterruptedException ignored) {}
 
         // if there is a token on the card, remove it
-        synchronized (slotToPlayerToken[slot]){
+        synchronized (slotToPlayerToken){
             if (slotToPlayerToken[slot] != null && !slotToPlayerToken[slot].isEmpty()) {
                 for (int player : slotToPlayerToken[slot]) {
                     removeToken(player, slot);
-                }
+                } 
             }
         }
         // remove the card from the table
@@ -135,11 +135,11 @@ public class Table {
         env.ui.removeCard(slot);
     }
 
-    public synchronized void placeOrRemoveToken(int player, int slot) {
+    public synchronized boolean placeOrRemoveToken(int player, int slot) {
         if (samePlayerTokenOnSlot(player, slot)) {
-            removeToken(player, slot);
+            return removeToken(player, slot);
         } else {
-            placeToken(player, slot);
+            return placeToken(player, slot);
         }
     }
 
@@ -148,20 +148,20 @@ public class Table {
      * @param player - the player the token belongs to.
      * @param slot   - the slot on which to place the token.
      */
-    public void placeToken(int player, int slot) {
+    public boolean placeToken(int player, int slot) {
         if (!slotHasCard(slot)) {
             env.logger.warning("error: trying to place a token on an empty slot");
-            return;
+            return false;
         }
         if (playerHasMaxTokens(player)) {
             env.logger.warning("error: trying to place a token when the player already has the maximum number of tokens");
-            return;
+            return false;
         }
         synchronized (slotToPlayerToken[slot]){       
             slotToPlayerToken[slot].add(player);
         }
         env.ui.placeToken(player, slot);
-        
+        return true;
     }
 
     /**

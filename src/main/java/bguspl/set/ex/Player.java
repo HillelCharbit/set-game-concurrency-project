@@ -103,9 +103,12 @@ public class Player implements Runnable {
                 waitForAction();
             }
             while (shouldExecuteAction()) {
-                executeAction();
-                waitForDealerResult();
-                acceptDealerResult();
+                boolean succeded = executeAction();
+                if (succeded && table.playerHasMaxTokens(id)) {
+                    deliverSetToDealer();
+                    waitForDealerResult();
+                    acceptDealerResult();
+                }
             }
             if (!human) {
                 notifyAiThreads();
@@ -127,12 +130,13 @@ public class Player implements Runnable {
             while (!terminate) {
                 Random random = new Random();
                 try {
-                    Thread.sleep(500);
+                    Thread.sleep(50);
                     synchronized (aiThread) { 
                         aiThread.wait();
                         if (shouldAllowOffer()) {
                             actions.offer(random.nextInt(table.getTableSize()));
                         }
+
                     }
                 } catch (InterruptedException ignored) {}
             }
@@ -181,16 +185,10 @@ public class Player implements Runnable {
     /**
         * Execute the next action in the queue.
         */
-    private void executeAction() {
+    private boolean executeAction() {
         synchronized (actions) {
             int slot = actions.poll();
-            table.placeOrRemoveToken(id, slot);
-            if (table.playerHasMaxTokens(id)) {
-                env.logger.info("player " + id + " has placed all tokens");
-                int[] slots = table.getPlayerSlots(id);
-                CardSet set = new CardSet(slots, id);
-                dealer.addSetToCheck(set);
-            }
+            return table.placeOrRemoveToken(id, slot);
         }
     }
 
@@ -225,7 +223,6 @@ public class Player implements Runnable {
                 Thread.sleep(100);
             } catch (InterruptedException ignored) {}
         }
-        table.removePlayerTokens(id);
         freezeState = State.Free;
         env.ui.setFreeze(id, 0);
     }
@@ -276,4 +273,11 @@ public class Player implements Runnable {
          }
          catch (InterruptedException ignored) {}
     }
+    private void deliverSetToDealer() {
+        env.logger.info("player " + id + " has placed all tokens");
+        int[] slots = table.getPlayerSlots(id);
+        CardSet set = new CardSet(slots, id);
+        dealer.addSetToCheck(set);
+    }
+        
 }
