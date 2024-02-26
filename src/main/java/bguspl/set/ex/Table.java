@@ -121,10 +121,7 @@ public class Table {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
 
-        // if there is a token on the card, remove it
-        if (slotToPlayerToken[slot] != null) {
-            slotToPlayerToken[slot].clear();
-        }
+        removeAllTokens(slot);
         // remove the card from the table
         int card = slotToCard[slot];
         slotToCard[slot] = null;
@@ -247,6 +244,13 @@ public class Table {
             return true;
         }
     }
+
+    private void removeAllTokens(int slot) {
+        for (int player : slotToPlayerToken[slot]) {
+            env.ui.removeToken(player, slot);
+        }
+        slotToPlayerToken[slot].clear();
+        }
     
     public void lockTable() {
         isBusy = true;
