@@ -112,6 +112,7 @@ public class Dealer implements Runnable {
     }
 
     private void executeSetCheck() {
+        table.lockTable();
         CardSet set = setsToCheck.poll();
         synchronized (players[set.getPlayerId()]) {        
             if (table.isLegalSet(set.getSlots())) {
@@ -129,6 +130,7 @@ public class Dealer implements Runnable {
             }
             players[set.getPlayerId()].notifyAll();
         }
+        table.unlockTable();
     }
 
     /**
@@ -136,25 +138,12 @@ public class Dealer implements Runnable {
      */
     private void placeCardsOnTable() {
         table.lockTable();
-        // Random rand = new Random();
-        // while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
-        //     int slotIndex = rand.nextInt(table.GetEmptySlots().size());
-        //     int card = rand.nextInt(deck.size());
-        //     table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
-        //     deck.remove(card);
-        // }
-        for (int i=0; i<table.slotToCard.length; i++) {
-            if (table.slotToCard[i]==null) {
-                if (!deck.isEmpty()) {
-                    // Random rand = new Random();
-                    // int index = rand.nextInt(deck.size());
-                    int index = 0;
-
-                    int card = deck.get(index);
-                    deck.remove(index);
-                    table.placeCard(card,i);
-                }
-            }
+        Random rand = new Random();
+        while (table.GetEmptySlots().size() > 0 && deck.size() > 0) {
+            int slotIndex = rand.nextInt(table.GetEmptySlots().size());
+            int card = rand.nextInt(deck.size());
+            table.placeCard(deck.get(card), table.GetEmptySlots().get(slotIndex));
+            deck.remove(card);
         }
         table.unlockTable();
     }
@@ -255,7 +244,7 @@ public class Dealer implements Runnable {
         return numWinners;
     }
 
-    public synchronized void addSetToCheck(CardSet set) {
+    public void addSetToCheck(CardSet set) {
         setsToCheck.offer(set);
         dealerThread.interrupt();
     }

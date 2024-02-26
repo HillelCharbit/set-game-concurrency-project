@@ -130,7 +130,6 @@ public class Player implements Runnable {
             while (!terminate) {
                 Random random = new Random();
                 try {
-                    Thread.sleep(50);
                     synchronized (aiThread) { 
                         aiThread.wait();
                         if (shouldAllowOffer()) {
@@ -236,7 +235,7 @@ public class Player implements Runnable {
     }
 
     public boolean shouldExecuteAction() {
-        return !actions.isEmpty();
+        return !actions.isEmpty() && table.isBusy() == false;
     }
 
     public boolean shouldAllowOffer() {

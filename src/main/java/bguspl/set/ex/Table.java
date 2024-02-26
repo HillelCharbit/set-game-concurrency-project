@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -53,7 +54,7 @@ public class Table {
         this.cardToSlot = cardToSlot;
         slotToPlayerToken = new Set[env.config.tableSize];
         for (int i = 0; i < env.config.tableSize; i++) {
-            slotToPlayerToken[i] = Collections.synchronizedSet(new HashSet<>());
+            slotToPlayerToken[i] = new HashSet<>();
         }        
         this.isBusy = false;
     }
@@ -115,18 +116,14 @@ public class Table {
      * Removes a card from a grid slot on the table.
      * @param slot - the slot from which to remove the card.
      */
-    public void removeCard(int slot) {
+    public synchronized void removeCard(int slot) {
         try {
             Thread.sleep(env.config.tableDelayMillis);
         } catch (InterruptedException ignored) {}
 
         // if there is a token on the card, remove it
-        synchronized (slotToPlayerToken){
-            if (slotToPlayerToken[slot] != null && !slotToPlayerToken[slot].isEmpty()) {
-                for (int player : slotToPlayerToken[slot]) {
-                    removeToken(player, slot);
-                } 
-            }
+        if (slotToPlayerToken[slot] != null) {
+            slotToPlayerToken[slot].clear();
         }
         // remove the card from the table
         int card = slotToCard[slot];
@@ -149,19 +146,19 @@ public class Table {
      * @param slot   - the slot on which to place the token.
      */
     public boolean placeToken(int player, int slot) {
-        if (!slotHasCard(slot)) {
-            env.logger.warning("error: trying to place a token on an empty slot");
-            return false;
-        }
-        if (playerHasMaxTokens(player)) {
-            env.logger.warning("error: trying to place a token when the player already has the maximum number of tokens");
-            return false;
-        }
         synchronized (slotToPlayerToken[slot]){       
-            slotToPlayerToken[slot].add(player);
+            if (!slotHasCard(slot)) {
+                env.logger.warning("error: trying to place a token on an empty slot");
+                return false;
+            }
+            if (playerHasMaxTokens(player)) {
+                env.logger.warning("error: trying to place a token when the player already has the maximum number of tokens");
+                return false;
+            }
+                slotToPlayerToken[slot].add(player);
+                env.ui.placeToken(player, slot);
+                return true;
         }
-        env.ui.placeToken(player, slot);
-        return true;
     }
 
     /**
@@ -171,13 +168,15 @@ public class Table {
      * @return       - true iff a token was successfully removed.
      */
     public boolean removeToken(int player, int slot) {
-        if (slotToCard[slot] == null) {
-            env.logger.warning("error: trying to remove a token from an empty slot");
-            return false;
+        synchronized (slotToPlayerToken[slot]){
+            if (slotToCard[slot] == null) {
+                env.logger.warning("error: trying to remove a token from an empty slot");
+                return false;
+            }
+            slotToPlayerToken[slot].remove(player);
+            env.ui.removeToken(player, slot);
+            return true;
         }
-        slotToPlayerToken[slot].remove(player);
-        env.ui.removeToken(player, slot);
-        return true;
     }
 
     public int getTableSize() { 
@@ -208,7 +207,6 @@ public class Table {
     private boolean samePlayerTokenOnSlot(int player, int slot) {
         return slotToPlayerToken[slot] != null && slotToPlayerToken[slot].contains(player);
     }
-
     public boolean playerHasMaxTokens(int player) {
         int tokens = 0;
         for (int i = 0; i < slotToPlayerToken.length; i++) {
@@ -240,19 +238,13 @@ public class Table {
 
     // Check if there is a token of the player on the slots
     public boolean isLegalSet(int[] slots) {
-        for (int slot : slots) {
-            if (slotToPlayerToken[slot] == null) {
-                return false;
+        synchronized (slotToPlayerToken) {
+            for (int slot : slots) {
+                if (slotToPlayerToken[slot] == null || slotToPlayerToken[slot].size() == 0) {
+                    return false;
+                }
             }
-        }
-        return true;
-    }
-
-    public void removePlayerTokens(int player) {
-        for (int i = 0; i < slotToPlayerToken.length; i++) {
-            if (slotToPlayerToken[i] != null && slotToPlayerToken[i].contains(player)) {
-                removeToken(player, i);
-            }
+            return true;
         }
     }
     
