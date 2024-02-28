@@ -12,13 +12,44 @@ with a short description of:
 
 1. Fully supporting all configuration fields and avoiding the use of magic numbers
 
-We are not entitled to this bonus.
+    a. How it was implemented in your code
+
+        Not using and strict number, always getting values like table size, number of players, etc from the config file. 
+        Not stricting capacity of data structures where we shouldnt and using foreach loops where needed.
+
+    b. Where it was used (in which class methods).
+
+        Player.java:
+            point() and penalty() freeze time is provided through the config file
+
+        Dealer.java:
+            no constraint on number of players, 
+            turn timeout and warning is configured with config.turnTimeoutMillis and config.turnTimeoutWarningMillis in updateTimerDisplay
+
+        Table.java:
+            table size is configured with config.tableSize, no constraint in the data structures for table size or number of tokens on each slot (using an array of sets)
+
+    c. How you tested that it is working correctly.
+
+        changed values in config file and ensure the program supports the changes.
 
 --------------------
 
 2. Terminating all threads (that you created) gracefully and in reverse order to the order they were created in.
 
-We are not entitled to this bonus.
+    a. How it was implemented in your code
+
+        using a for loop in reverse order on the Dealer's players array, and using the join method to ensure the threads are terminated in the desired order.
+
+    b. Where it was used (in which class methods).
+
+        Dealer::terminate and Player::terminate
+
+    c. How you tested that it is working correctly.
+
+        ran the program serval times and ensure the player threads are terminated in desired order in the log file
+
+
 
 --------------------
 
@@ -35,4 +66,24 @@ We are not entitled to this bonus.
 changed on the display, key input needs to be handled, etc.) and the only threads created by you are:
 1 thread per player + 1 additional thread for non-human players.
 
-We are not entitled to this bonus.
+    a. How it was implemented in your code
+
+        Dealer thread wakes up only in 2 scenarios: update timer, when a player chose a third (or config.FeatureSize)
+        and notify the dealer to check the set
+
+        Player thread wakes up only in 2 scenarios: when token is registered (human or ai), 
+        and when dealer finished to check his set and sent a result. 
+
+    b. Where it was used (in which class methods).
+
+        Dealer.java:
+            sleepUntilWokenOrTimeout() wakes up the thread after each second (or ten millis in warning mode)
+            addSetToCheck(CardSet set) wakes up the thread after a player sent a set
+
+        Player.java:
+            keyPressed wakes up the thread after a key press
+            acceptDealerResult() wakes up the thread after dealer result was acceptDealerResult
+
+    c. How you tested that it is working correctly.
+
+        carefully debugging and log commands.
