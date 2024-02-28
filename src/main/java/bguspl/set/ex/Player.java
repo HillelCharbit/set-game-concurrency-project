@@ -5,6 +5,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
 import bguspl.set.Env;
+import bguspl.set.ex.Dealer.Num;
 
 /**
  * This class manages the players' threads and data
@@ -37,6 +38,7 @@ public class Player implements Runnable {
     /**
      * The thread representing the current player.
      */
+    public Thread playerThread;
 
     /**
      * The thread of the AI (computer) player (an additional thread used to generate key presses).
@@ -63,6 +65,7 @@ public class Player implements Runnable {
      */
     private volatile BlockingQueue<Integer> actions;
 
+    private int OneHundredMillis = 100;
     public enum State {
         Free,
         Point,
@@ -97,7 +100,7 @@ public class Player implements Runnable {
     public void run() {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         if (!human) createArtificialIntelligence();
-
+        playerThread = Thread.currentThread();
         while (!terminate) {
             if (human) {
                 waitForAction();
@@ -149,10 +152,10 @@ public class Player implements Runnable {
      */
     public void terminate() {
         terminate = true;
-        synchronized (this) 
-        { 
-            notifyAll(); 
-        }
+        playerThread.interrupt();
+        try {
+            playerThread.join();
+        } catch (InterruptedException ignored) {}     
     }
 
     /**
@@ -203,12 +206,12 @@ public class Player implements Runnable {
         while (System.currentTimeMillis() < freezeTime) {
             env.ui.setFreeze(id, freezeTime - System.currentTimeMillis());
             try {
-                Thread.sleep(100);
+                Thread.sleep(OneHundredMillis);
             } catch (InterruptedException ignored) {}
         }
-        env.ui.setFreeze(id, 0);
+        env.ui.setFreeze(id, Num.ZERO.value);
         freezeState = State.Free;
-        int ignored = table.countCards(); // this part is just for demonstration in the unit tests
+        // int ignored = table.countCards(); // this part is just for demonstration in the unit tests
     }
 
     /**
@@ -219,11 +222,11 @@ public class Player implements Runnable {
         while (System.currentTimeMillis() < freezeTime) {
             env.ui.setFreeze(id, freezeTime - System.currentTimeMillis());
             try {
-                Thread.sleep(100);
+                Thread.sleep(OneHundredMillis);
             } catch (InterruptedException ignored) {}
         }
         freezeState = State.Free;
-        env.ui.setFreeze(id, 0);
+        env.ui.setFreeze(id, Num.ZERO.value);
     }
 
     public int score() {
@@ -267,16 +270,22 @@ public class Player implements Runnable {
         }
     }
     private void waitForDealerResult() {
-        try {
-            synchronized (this) { wait(); }
-         }
-         catch (InterruptedException ignored) {}
+        if (freezeState == State.Free) {
+            try {
+                synchronized (this) { wait(); }
+            }
+            catch (InterruptedException ignored) {}
+        }
     }
     private void deliverSetToDealer() {
         env.logger.info("player " + id + " has placed all tokens");
         int[] slots = table.getPlayerSlots(id);
         CardSet set = new CardSet(slots, id);
         dealer.addSetToCheck(set);
+    }
+
+    public void notifyResult() {
+        synchronized (this) { notifyAll(); }
     }
         
 }

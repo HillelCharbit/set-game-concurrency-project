@@ -1,12 +1,11 @@
 package bguspl.set.ex;
 
 import bguspl.set.Env;
+import bguspl.set.ex.Dealer.Num;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -48,12 +47,13 @@ public class Table {
      * @param slotToCard - mapping between a slot and the card placed in it (null if none).
      * @param cardToSlot - mapping between a card and the slot it is in (null if none).
      */
+    @SuppressWarnings("unchecked")
     public Table(Env env, Integer[] slotToCard, Integer[] cardToSlot) {
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
         slotToPlayerToken = new Set[env.config.tableSize];
-        for (int i = 0; i < env.config.tableSize; i++) {
+        for (int i = Num.ZERO.value; i < env.config.tableSize; i++) {
             slotToPlayerToken[i] = new HashSet<>();
         }        
         this.isBusy = false;
@@ -88,7 +88,7 @@ public class Table {
      * @return - the number of cards on the table.
      */
     public int countCards() {
-        int cards = 0;
+        int cards = Num.ZERO.value;
         for (Integer card : slotToCard)
             if (card != null)
                 ++cards;
@@ -182,15 +182,14 @@ public class Table {
 
     public int getCard(int slot) {
         if (slotToCard[slot] == null) {
-            return -1;
+            return Num.NegONE.value;
         }
         return slotToCard[slot];
     }
     
     public ArrayList<Integer> GetEmptySlots() {
         ArrayList<Integer> emptySlots = new ArrayList<>();
-        for (int i = 0; i < slotToCard.length; i++) 
-        {
+        for (int i = Num.ZERO.value; i < slotToCard.length; i++){
             if (slotToCard[i] == null)
                 emptySlots.add(i);
         }
@@ -205,8 +204,9 @@ public class Table {
         return slotToPlayerToken[slot] != null && slotToPlayerToken[slot].contains(player);
     }
     public boolean playerHasMaxTokens(int player) {
-        int tokens = 0;
-        for (int i = 0; i < slotToPlayerToken.length; i++) {
+        int tokens = Num.ZERO.value;
+
+        for (int i = Num.ZERO.value; i < slotToPlayerToken.length; i++) {
             if (slotToPlayerToken[i] != null && slotToPlayerToken[i].contains(player)) {
                 tokens++;
             }
@@ -216,8 +216,8 @@ public class Table {
 
     public int[] getPlayerSlots(int player) {
         int[] slots = new int[env.config.featureSize];
-        int j = 0;
-        for (int i = 0; i < slotToPlayerToken.length; i++) {
+        int j = Num.ZERO.value;
+        for (int i = Num.ZERO.value; i < slotToPlayerToken.length; i++) {
             if (slotToPlayerToken[i] != null && slotToPlayerToken[i].contains(player)) {
                 slots[j++] = i;
             }
@@ -227,7 +227,7 @@ public class Table {
 
     public int[] slotsToCards(int[] slots) {
         int[] cards = new int[slots.length];
-        for (int i = 0; i < slots.length; i++) {
+        for (int i = Num.ZERO.value; i < slots.length; i++) {
             cards[i] = slotToCard[slots[i]];
         }
         return cards;
@@ -237,7 +237,7 @@ public class Table {
     public boolean isLegalSet(int[] slots) {
         synchronized (slotToPlayerToken) {
             for (int slot : slots) {
-                if (slotToPlayerToken[slot] == null || slotToPlayerToken[slot].size() == 0) {
+                if (slotToPlayerToken[slot] == null || slotToPlayerToken[slot].size() == Num.ZERO.value) {
                     return false;
                 }
             }
