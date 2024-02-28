@@ -152,10 +152,6 @@ public class Player implements Runnable {
      */
     public void terminate() {
         terminate = true;
-        playerThread.interrupt();
-        try {
-            playerThread.join();
-        } catch (InterruptedException ignored) {}     
     }
 
     /**
@@ -247,7 +243,7 @@ public class Player implements Runnable {
     }
 
     private void waitForAction() {
-        while (actions.isEmpty()) {
+        while (actions.isEmpty() && !terminate) {
             try {
                 synchronized (this) { wait(); }
             } catch (InterruptedException ignored) {}

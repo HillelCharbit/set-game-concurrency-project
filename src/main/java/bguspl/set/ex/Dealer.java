@@ -112,12 +112,17 @@ public class Dealer implements Runnable {
      * Called when the game should be terminated.
      */
     public void terminate() {
-        // treminate each player thread in reverse order, then the dealer thread
+        // Reverse order termination of player threads
         for (int i = players.length - 1; i >= 0; i--) {
-                players[i].terminate();
-            }  
+            try {
+                players[i].terminate(); // Terminate player
+                playerThreads[i].interrupt();
+                playerThreads[i].joinWithLog(); // Dealer wait for player to terminate
+            } catch (InterruptedException ignored) {}
+        }
+        // Terminate dealer after all players are done
         terminate = true;
-        dealerThread.interrupt();
+        dealerThread.interrupt(); // Ensure dealer wakes up if waiting
     }
 
     /**
