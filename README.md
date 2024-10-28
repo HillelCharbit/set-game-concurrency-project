@@ -1,6 +1,3 @@
-Here's a well-structured and professional README for your Set Game project:
-
----
 
 # Set Game
 
@@ -120,5 +117,3 @@ Please open an issue to discuss potential changes or improvements before startin
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
